@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Lovit brand purple for notification icon tint -->
+    <color name="notification_color">#9B6FFF</color>
+</resources>
