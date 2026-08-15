@@ -4,8 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../services/supabase_service.dart';
+import '../widgets/secure_media_image.dart';
 
 const _kBgDark = Color(0xFF09090B);
 const _kCardBg = Color(0xFF131318);
@@ -247,16 +247,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 child: _selectedImage != null
                                     ? Image.file(_selectedImage!, fit: BoxFit.cover)
                                     : (_avatarUrl != null && _avatarUrl!.isNotEmpty
-                                        ? CachedNetworkImage(
-                                            imageUrl: _avatarUrl!,
+                                        ? SecureMediaImage(
+                                            value: _avatarUrl!,
                                             fit: BoxFit.cover,
-                                            placeholder: (context, url) => Container(
+                                            placeholder: Container(
                                               color: _kCardBg,
                                               child: const Center(
                                                 child: CircularProgressIndicator(color: _kPurple, strokeWidth: 2),
                                               ),
                                             ),
-                                            errorWidget: (context, url, error) => _buildFallbackAvatar(),
+                                            errorWidget: _buildFallbackAvatar(),
                                           )
                                         : _buildFallbackAvatar()),
                               ),

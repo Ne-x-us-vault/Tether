@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lovit/services/encryption_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,6 +13,7 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    FlutterSecureStorage.setMockInitialValues({});
     algorithm = X25519();
   });
 
@@ -76,6 +78,42 @@ void main() {
       final second = await EncryptionService.instance.getPublicKeyBase64();
       expect(first, second);
       expect(first.length, greaterThan(20));
+    });
+
+    test('private key lives in secure storage, not shared preferences', () async {
+      await EncryptionService.instance.getPublicKeyBase64();
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('e2ee_private_key'), isNull);
+    });
+
+    test('legacy SharedPreferences key migrates into secure storage', () async {
+      final seed = base64Encode(
+        List<int>.generate(32, (i) => i),
+      );
+      SharedPreferences.setMockInitialValues({
+        'e2ee_private_key': seed,
+      });
+      final service = EncryptionService.instance;
+      await service.resetForUser();
+
+      final pub = await service.getPublicKeyBase64();
+      expect(pub, isNotEmpty);
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('e2ee_private_key'), isNull);
+    });
+
+    test('myFingerprint is stable and formatted in 4 groups of 8 hex', () async {
+      final a = await EncryptionService.instance.myFingerprint();
+      final b = await EncryptionService.instance.myFingerprint();
+      expect(a, b);
+      expect(a.length, greaterThanOrEqualTo(4 * 8 + 2));
+      final groups = a.split('  ');
+      expect(groups.length, 4);
+      expect(
+        groups.every((g) => RegExp(r'^[0-9A-F]{8}$').hasMatch(g)),
+        isTrue,
+      );
     });
   });
 }

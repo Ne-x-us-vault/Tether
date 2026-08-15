@@ -4,9 +4,9 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../services/supabase_service.dart';
 import '../widgets/glass.dart';
+import '../widgets/secure_media_image.dart';
 import 'chat_screen.dart';
 
 class ChatListScreen extends StatefulWidget {
@@ -854,10 +854,10 @@ class _AvatarWithStatus extends StatelessWidget {
           ),
           child: ClipOval(
             child: avatarUrl != null && avatarUrl!.isNotEmpty
-                ? CachedNetworkImage(
-                    imageUrl: avatarUrl!,
+                ? SecureMediaImage(
+                    value: avatarUrl!,
                     fit: BoxFit.cover,
-                    placeholder: (context, url) => Center(
+                    placeholder: Center(
                       child: Text(
                         initial.toUpperCase(),
                         style: const TextStyle(
@@ -867,7 +867,7 @@ class _AvatarWithStatus extends StatelessWidget {
                         ),
                       ),
                     ),
-                    errorWidget: (context, url, error) => Center(
+                    errorWidget: Center(
                       child: Text(
                         initial.toUpperCase(),
                         style: const TextStyle(

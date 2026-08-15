@@ -789,6 +789,7 @@ class SupabaseService {
 
   /// Sign out current user
   Future<void> signOut() async {
+    _signedUrlCache.clear();
     await client.auth.signOut();
   }
 
@@ -2686,11 +2687,14 @@ class SupabaseService {
   // STORAGE
   // ────────────────────────────────────────────────────────────────────────────
 
+  /// Buckets are private (SEC-14); upload functions return the storage *path*
+  /// (e.g. `messages/<pairing>/<file>`) instead of a public URL. Consumers
+  /// resolve a short-lived signed URL via [secureMediaUrl] at display time.
   Future<String> uploadAvatar(String userId, String filePath) async {
     final fileName = 'avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
     final path = '$userId/$fileName';
     await client.storage.from('avatars').upload(path, File(filePath));
-    return client.storage.from('avatars').getPublicUrl(path);
+    return 'avatars/$path';
   }
 
   Future<String> uploadMessageMedia(
@@ -2708,7 +2712,7 @@ class SupabaseService {
           File(filePath), // ← wrap with File
           fileOptions: FileOptions(contentType: fileType),
         );
-    return client.storage.from('messages').getPublicUrl(path);
+    return 'messages/$path';
   }
 
   Future<String> uploadMemory(
@@ -2724,7 +2728,67 @@ class SupabaseService {
           path,
           File(filePath), // ← wrap with File
         );
-    return client.storage.from('memories').getPublicUrl(path);
+    return 'memories/$path';
+  }
+
+  // ── Signed-URL resolution for private media (SEC-14) ──────────────────────
+
+  static const Duration _signedUrlTtl = Duration(hours: 48);
+  static final Map<String, ({String url, DateTime expiresAt})>
+      _signedUrlCache = {};
+
+  /// Resolves a stored media reference into a URL usable by network-image
+  /// widgets. Accepts:
+  ///   - a storage path (`avatars/…`, `messages/…`, `memories/…`) → signed URL,
+  ///   - a legacy public storage URL (already in the DB) → re-signed,
+  ///   - an external URL → returned unchanged,
+  ///   - anything else (local file path) → returned unchanged.
+  Future<String> secureMediaUrl(String value) async {
+    if (value.isEmpty) return value;
+
+    if (!value.startsWith('http')) {
+      if (value.startsWith('avatars/') ||
+          value.startsWith('messages/') ||
+          value.startsWith('memories/')) {
+        final bucket = value.substring(0, value.indexOf('/'));
+        return _signedUrl(bucket, value);
+      }
+      return value; // local file path or unknown
+    }
+
+    final legacy = _parseLegacyStorageUrl(value);
+    if (legacy != null) return _signedUrl(legacy.bucket, legacy.path);
+    return value; // external URL
+  }
+
+  ({String bucket, String path})? _parseLegacyStorageUrl(String url) {
+    final match = RegExp(
+      r'^https?://[^/]+/storage/v1/object/public/([^/]+)/(.+)$',
+    ).firstMatch(url);
+    if (match == null) return null;
+    return (bucket: match.group(1)!, path: match.group(2)!);
+  }
+
+  Future<String> _signedUrl(String bucket, String path) async {
+    final now = DateTime.now();
+    final cacheKey = '$bucket/$path';
+    final cached = _signedUrlCache[cacheKey];
+    if (cached != null && cached.expiresAt.isAfter(now)) {
+      return cached.url;
+    }
+    try {
+      final url = await client.storage
+          .from(bucket)
+          .createSignedUrl(path, _signedUrlTtl.inSeconds);
+      _signedUrlCache[cacheKey] = (
+        url: url,
+        expiresAt: now.add(_signedUrlTtl),
+      );
+      return url;
+    } catch (e) {
+      debugPrint('[Storage] Signed URL failed for $cacheKey: $e');
+      return path;
+    }
   }
 
   // ────────────────────────────────────────────────────────────────────────────
