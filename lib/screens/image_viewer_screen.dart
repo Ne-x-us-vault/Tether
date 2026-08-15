@@ -1,6 +1,5 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../widgets/secure_media_image.dart';
 
 class IGImageViewerScreen extends StatelessWidget {
   final String imageUrl;
@@ -9,8 +8,6 @@ class IGImageViewerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isLocal = !imageUrl.startsWith('http');
-
     return Scaffold(
       backgroundColor: const Color(0xFF050505),
       body: Stack(
@@ -21,38 +18,36 @@ class IGImageViewerScreen extends StatelessWidget {
               minScale: 0.5,
               maxScale: 4.0,
               clipBehavior: Clip.none,
-              child: isLocal
-                  ? Image.file(File(imageUrl), fit: BoxFit.contain)
-                  : CachedNetworkImage(
-                      imageUrl: imageUrl,
-                      fit: BoxFit.contain,
-                      placeholder: (context, url) => const Center(
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Color(0xFF3797F0),
-                          ),
-                          strokeWidth: 2,
-                        ),
-                      ),
-                      errorWidget: (context, url, error) => const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.broken_image_rounded,
-                            color: Colors.white24,
-                            size: 48,
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Failed to load image',
-                            style: TextStyle(
-                              color: Colors.white38,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
+              child: SecureMediaImage(
+                value: imageUrl,
+                fit: BoxFit.contain,
+                placeholder: const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Color(0xFF3797F0),
+                    ),
+                    strokeWidth: 2,
+                  ),
+                ),
+                errorWidget: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.broken_image_rounded,
+                      color: Colors.white24,
+                      size: 48,
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Failed to load image',
+                      style: TextStyle(
+                        color: Colors.white38,
+                        fontSize: 13,
                       ),
                     ),
+                  ],
+                ),
+              ),
             ),
           ),
 

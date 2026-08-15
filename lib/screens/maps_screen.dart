@@ -14,6 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../main.dart' show kNavBarPad;
 import '../services/location_sync_service.dart';
 import '../services/supabase_service.dart';
+import '../widgets/secure_media_image.dart';
 
 const Color _kBg = Color(0xFF08080C);
 const Color _kAccent = Color(0xFFC0A9FF);
@@ -791,15 +792,40 @@ class _AvatarPin extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: CircleAvatar(
-                  radius: 20,
-                  backgroundColor: _kSurface,
-                  backgroundImage: profile?.avatarUrl != null
-                      ? NetworkImage(profile!.avatarUrl!)
-                      : null,
-                  child: profile?.avatarUrl == null
-                      ? Icon(Icons.person_rounded, color: color, size: 20)
-                      : null,
+                child: SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: ClipOval(
+                    child: profile?.avatarUrl != null
+                        ? SecureMediaImage(
+                            value: profile!.avatarUrl!,
+                            fit: BoxFit.cover,
+                            placeholder: Container(
+                              color: _kSurface,
+                              child: Icon(
+                                Icons.person_rounded,
+                                color: color,
+                                size: 20,
+                              ),
+                            ),
+                            errorWidget: Container(
+                              color: _kSurface,
+                              child: Icon(
+                                Icons.person_rounded,
+                                color: color,
+                                size: 20,
+                              ),
+                            ),
+                          )
+                        : Container(
+                            color: _kSurface,
+                            child: Icon(
+                              Icons.person_rounded,
+                              color: color,
+                              size: 20,
+                            ),
+                          ),
+                  ),
                 ),
               ),
               const SizedBox(height: 4),

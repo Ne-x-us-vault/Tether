@@ -9,7 +9,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -24,6 +23,7 @@ import 'image_editor_screen.dart';
 import 'image_viewer_screen.dart';
 import '../services/call_service.dart';
 import '../services/notification_service.dart';
+import '../widgets/secure_media_image.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // IG DESIGN TOKENS
@@ -1165,11 +1165,21 @@ class _ChatScreenState extends State<ChatScreen>
     }
 
     final roomName = _buildCallRoomName(isVideo: isVideo);
+    // Avatars are now stored as private storage paths; resolve a short-lived
+    // signed URL so the call UI can render them for the call's duration.
+    final myAvatar = _myProfile?.avatarUrl ?? '';
+    final partnerAvatar = _partner?.avatarUrl ?? '';
+    final myAvatarUrl =
+        myAvatar.isEmpty ? '' : await _sb.secureMediaUrl(myAvatar);
+    final partnerAvatarUrl = partnerAvatar.isEmpty
+        ? ''
+        : await _sb.secureMediaUrl(partnerAvatar);
+
     final joined = await CallService.instance.startOutgoingCall(
       roomName: roomName,
       isVideo: isVideo,
       displayName: _myCallDisplayName(),
-      avatarUrl: _myProfile?.avatarUrl,
+      avatarUrl: myAvatarUrl.isEmpty ? null : myAvatarUrl,
     );
 
     if (!joined) {
@@ -1194,9 +1204,9 @@ class _ChatScreenState extends State<ChatScreen>
             'pairing_id': _pairing!.id,
             'room_name': roomName,
             'caller_name': callerName,
-            'caller_avatar_url': _myProfile?.avatarUrl ?? '',
+            'caller_avatar_url': myAvatarUrl,
             'recipient_name': _partner?.displayName ?? '',
-            'recipient_avatar_url': _partner?.avatarUrl ?? '',
+            'recipient_avatar_url': partnerAvatarUrl,
           },
         ),
       );
@@ -2666,21 +2676,20 @@ class _ChatScreenState extends State<ChatScreen>
                 CircleAvatar(
                   radius: 19,
                   backgroundColor: _IG.inputBg,
-                  backgroundImage: _partner?.avatarUrl != null
-                      ? CachedNetworkImageProvider(_partner!.avatarUrl!)
-                      : null,
-                  child: _partner?.avatarUrl == null
-                      ? Text(
-                          _partnerName.isEmpty
-                              ? '?'
-                              : _partnerName[0].toUpperCase(),
-                          style: const TextStyle(
-                            color: _IG.textPrimary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: _IG.fontSizeMd,
+                  child: _partner?.avatarUrl != null
+                      ? ClipOval(
+                          child: SizedBox(
+                            width: 38,
+                            height: 38,
+                            child: SecureMediaImage(
+                              value: _partner!.avatarUrl!,
+                              fit: BoxFit.cover,
+                              placeholder: _partnerAvatarInitial(),
+                              errorWidget: _partnerAvatarInitial(),
+                            ),
                           ),
                         )
-                      : null,
+                      : _partnerAvatarInitial(),
                 ),
                 if (_partnerOnline)
                   Positioned(
@@ -3521,6 +3530,19 @@ class _ChatScreenState extends State<ChatScreen>
   // PROFILE SHEET
   // ─────────────────────────────────────────────────────────────────────────
 
+  Widget _partnerAvatarInitial() {
+    return Center(
+      child: Text(
+        _partnerName.isEmpty ? '?' : _partnerName[0].toUpperCase(),
+        style: const TextStyle(
+          color: _IG.textPrimary,
+          fontWeight: FontWeight.bold,
+          fontSize: _IG.fontSizeMd,
+        ),
+      ),
+    );
+  }
+
   void _showProfileSheet() {
     final avatarUrl = _partner?.avatarUrl;
 
@@ -3552,17 +3574,16 @@ class _ChatScreenState extends State<ChatScreen>
                           child: avatarUrl != null
                               ? Hero(
                                   tag: 'partner_avatar',
-                                  child: CachedNetworkImage(
-                                    imageUrl: avatarUrl,
+                                  child: SecureMediaImage(
+                                    value: avatarUrl,
                                     fit: BoxFit.contain,
-                                    placeholder: (_, _) => const Center(
+                                    placeholder: const Center(
                                       child: CircularProgressIndicator(
                                         color: Colors.white54,
                                         strokeWidth: 2,
                                       ),
                                     ),
-                                    errorWidget: (_, _, _) =>
-                                        _profileFallback(),
+                                    errorWidget: _profileFallback(),
                                   ),
                                 )
                               : _profileFallback(),
@@ -4421,42 +4442,29 @@ class _IGMessageBubbleState extends State<_IGMessageBubble> {
               borderRadius: BorderRadius.circular(10),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(10),
-                child: widget.message.mediaUrl!.startsWith('http')
-                    ? CachedNetworkImage(
-                        imageUrl: widget.message.mediaUrl!,
-                        placeholder: (_, _) => Container(
-                          height: 180,
-                          width: 200,
-                          color: Colors.black.withValues(alpha: 0.1),
-                          child: const Center(
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        ),
-                        errorWidget: (_, _, _) => Container(
-                          height: 180,
-                          width: 200,
-                          color: Colors.black.withValues(alpha: 0.1),
-                          child: const Icon(
-                            Icons.broken_image_rounded,
-                            color: Colors.white60,
-                          ),
-                        ),
-                      )
-                    : Image.file(
-                        File(widget.message.mediaUrl!),
-                        height: 180,
-                        width: 200,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => Container(
-                          height: 180,
-                          width: 200,
-                          color: Colors.black.withValues(alpha: 0.1),
-                          child: const Icon(
-                            Icons.broken_image_rounded,
-                            color: Colors.white60,
-                          ),
-                        ),
-                      ),
+                child: SecureMediaImage(
+                  value: widget.message.mediaUrl!,
+                  fit: BoxFit.cover,
+                  width: 200,
+                  height: 180,
+                  placeholder: Container(
+                    width: 200,
+                    height: 180,
+                    color: Colors.black.withValues(alpha: 0.1),
+                    child: const Center(
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                  errorWidget: Container(
+                    width: 200,
+                    height: 180,
+                    color: Colors.black.withValues(alpha: 0.1),
+                    child: const Icon(
+                      Icons.broken_image_rounded,
+                      color: Colors.white60,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -4468,17 +4476,21 @@ class _IGMessageBubbleState extends State<_IGMessageBubble> {
               onTap: () async {
                 final url = widget.message.mediaUrl!;
                 try {
-                  if (url.startsWith('http')) {
-                    final uri = Uri.parse(url);
-                    final success = await launchUrl(
-                      uri,
-                      mode: LaunchMode.externalApplication,
-                    );
-                    if (!success) {
-                      widget.showToast('Cannot open document');
-                    }
-                  } else {
+                  final isLocal =
+                      !url.startsWith('http') && File(url).existsSync();
+                  if (isLocal) {
                     widget.showToast('Document is uploading...');
+                    return;
+                  }
+                  final resolved =
+                      await SupabaseService().secureMediaUrl(url);
+                  final uri = Uri.parse(resolved);
+                  final success = await launchUrl(
+                    uri,
+                    mode: LaunchMode.externalApplication,
+                  );
+                  if (!success) {
+                    widget.showToast('Cannot open document');
                   }
                 } catch (e) {
                   widget.showToast('Cannot open document');
@@ -6391,10 +6403,10 @@ class _MediaPageState extends State<_MediaPage> {
             children: [
               // Image preview or beautifully color-coded media icons
               if (isImage)
-                CachedNetworkImage(
-                  imageUrl: msg.mediaUrl!,
+                SecureMediaImage(
+                  value: msg.mediaUrl!,
                   fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(
+                  placeholder: Container(
                     color: Colors.white.withValues(alpha: 0.04),
                     child: const Center(
                       child: SizedBox(
@@ -6407,7 +6419,7 @@ class _MediaPageState extends State<_MediaPage> {
                       ),
                     ),
                   ),
-                  errorWidget: (context, url, error) => Container(
+                  errorWidget: Container(
                     color: Colors.white.withValues(alpha: 0.04),
                     child: const Center(
                       child: Icon(

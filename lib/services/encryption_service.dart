@@ -3,20 +3,29 @@ import 'dart:convert';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'supabase_service.dart';
 
 /// End-to-end encryption for message content.
 ///
-/// Each user owns an X25519 key pair. The private half stays on the device
-/// (shared_preferences) and never leaves it; the public half is stored in the
-/// user's profile preferences (`e2ee_pubkey`) so partners can reach it.
+/// Each user owns an X25519 key pair. The private half stays on the device and
+/// never leaves it; the public half is stored in the user's profile
+/// preferences (`e2ee_pubkey`) so partners can reach it.
+///
+/// SEC-15: the private key seed is kept in platform secure storage
+/// (Android Keystore / iOS Keychain via `flutter_secure_storage`) instead of
+/// plaintext SharedPreferences. Keys written before this change are migrated
+/// into secure storage on first load.
 ///
 /// For a given pairing the message AES-256-GCM key is derived from the ECDH
 /// shared secret of (own private key, partner public key). Because ECDH is
 /// symmetric, both partners derive the same key and can decrypt each other's
 /// messages while the server only ever sees ciphertext.
+///
+/// SEC-15b: partners can compare public-key fingerprints ([myFingerprint] /
+/// [partnerFingerprint]) out of band to detect any key swap (MITM).
 ///
 /// Ciphertext uses the envelope `lv1:<b64 nonce>.<b64 ciphertext>.<b64 mac>`.
 /// Values that do not start with `lv1:` are treated as legacy plaintext
@@ -31,6 +40,8 @@ class EncryptionService {
   static const String _privKeyPrefKey = 'e2ee_private_key';
   static const String _hkdfInfo = 'lovit-e2ee-v1';
 
+  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
+
   final X25519 _x25519 = X25519();
   SimpleKeyPair? _keyPair;
 
@@ -42,8 +53,7 @@ class EncryptionService {
     final cached = _keyPair;
     if (cached != null) return cached;
 
-    final prefs = await SharedPreferences.getInstance();
-    final seedB64 = prefs.getString(_privKeyPrefKey);
+    final seedB64 = await _readSeed();
     if (seedB64 != null) {
       try {
         final pair = await _x25519.newKeyPairFromSeed(base64Decode(seedB64));
@@ -56,9 +66,36 @@ class EncryptionService {
 
     final pair = await _x25519.newKeyPair();
     final seed = await pair.extractPrivateKeyBytes();
-    await prefs.setString(_privKeyPrefKey, base64Encode(seed));
+    await _secureStorage.write(
+      key: _privKeyPrefKey,
+      value: base64Encode(seed),
+    );
     _keyPair = pair;
     return pair;
+  }
+
+  /// Reads the private key seed from secure storage, migrating it from the
+  /// legacy plaintext SharedPreferences location (pre-SEC-15) if present.
+  Future<String?> _readSeed() async {
+    try {
+      final stored = await _secureStorage.read(key: _privKeyPrefKey);
+      if (stored != null && stored.isNotEmpty) return stored;
+    } catch (e) {
+      debugPrint('[E2EE] Secure storage read failed: $e');
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final legacy = prefs.getString(_privKeyPrefKey);
+      if (legacy != null && legacy.isNotEmpty) {
+        await _secureStorage.write(key: _privKeyPrefKey, value: legacy);
+        await prefs.remove(_privKeyPrefKey);
+        return legacy;
+      }
+    } catch (e) {
+      debugPrint('[E2EE] Legacy key migration failed: $e');
+    }
+    return null;
   }
 
   /// Base64-encoded public key for this device.
@@ -193,6 +230,39 @@ class EncryptionService {
       debugPrint('[E2EE] Decrypt failed for $pairingId: $e');
       return null;
     }
+  }
+
+  /// SHA-256 fingerprint of this device's public key (4 groups of 8 hex).
+  ///
+  /// Compare it with [partnerFingerprint] (or out of band with your partner)
+  /// to confirm no public key has been swapped, i.e. the channel is not
+  /// being MITM'd. Both partners should derive the same shared secret only
+  /// when each holds the other's true public key.
+  Future<String> myFingerprint() async {
+    final publicKey = await getPublicKeyBase64();
+    return _fingerprintOf(publicKey);
+  }
+
+  /// Fingerprint of the partner's published public key for [pairingId], or
+  /// null when the partner hasn't published a key yet.
+  Future<String?> partnerFingerprint(String pairingId) async {
+    try {
+      final partner = await SupabaseService().getPartnerProfile(pairingId);
+      final pub = partner?.preferences['e2ee_pubkey'];
+      if (pub is! String || pub.isEmpty) return null;
+      return _fingerprintOf(pub);
+    } catch (e) {
+      debugPrint('[E2EE] Could not load partner fingerprint: $e');
+      return null;
+    }
+  }
+
+  Future<String> _fingerprintOf(String publicKeyB64) async {
+    final hash = await Sha256().hash(base64Decode(publicKeyB64));
+    final hex = hash.bytes
+        .map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase())
+        .join();
+    return [0, 4, 8, 12].map((i) => hex.substring(i, i + 8)).join('  ');
   }
 
   /// Clears in-memory key material (used on logout / user switch).

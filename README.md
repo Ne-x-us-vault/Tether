@@ -77,13 +77,28 @@ test/                       Unit tests
      ```
    - Configure Firebase/FCM for push notifications on each platform.
 
-3. **Run**
+3. **Firebase config (Android)**
+
+   `android/app/google-services.json` is **git-ignored** because it contains a
+   Google API key (SEC-16). To build the Android app you must have a real file
+   on disk:
+
+   ```sh
+   cp android/app/google-services.json.example android/app/google-services.json
+   ```
+
+   then fill it in with values from your own Firebase project (Console →
+   *Project settings → Your apps → Android app*, matching the `applicationId`).
+   The Google services Gradle plugin fails the build if the real file is
+   missing, so anyone cloning the repo must provide their own.
+
+4. **Run**
 
    ```sh
    flutter run
    ```
 
-4. **Verify**
+5. **Verify**
 
    ```sh
    dart analyze
@@ -95,9 +110,11 @@ test/                       Unit tests
 - Client apps use only the anon key; all privileged operations go through RLS
   policies and SECURITY DEFINER RPCs (e.g. `join_pairing`, which atomically
   claims a pending pairing after validating code expiry and status).
-- Storage buckets (`avatars`, `messages`, `memories`) are scoped to path
-  conventions (`<user id>/`, `<pairing id>/`) so users can only touch their
-  own content.
+- Storage buckets (`avatars`, `messages`, `memories`) are **private** (SEC-14):
+  uploads are scoped to path conventions (`<user id>/`, `<pairing id>/`) and
+  reads require auth as the owner / pairing member. The client stores storage
+  paths and resolves short-lived signed URLs at display time (legacy public
+  URLs already in the DB are re-signed transparently).
 - Push notifications are sent via the `send-notification` edge function, which
   verifies the caller's JWT, rejects sends without an active pairing, validates
   UUIDs before building filters, and rate-limits. Notification bodies never
@@ -108,8 +125,11 @@ test/                       Unit tests
 Message content is end-to-end encrypted in transit and at rest:
 
 - Each device generates an **X25519** key pair on login; the private half lives
-  only in `SharedPreferences` and never leaves the device. The public half is
-  published to the user's profile (`preferences.e2ee_pubkey`).
+  only in platform secure storage (Android Keystore / iOS Keychain via
+  `flutter_secure_storage`) and never leaves the device (SEC-15). Keys written
+  to the pre-SEC-15 plaintext `SharedPreferences` location are migrated into
+  secure storage on first load. The public half is published to the user's
+  profile (`preferences.e2ee_pubkey`).
 - For a pairing, the **AES-256-GCM** key is derived via ECDH(own private key,
   partner public key) → HKDF-SHA256, so both partners derive the same key and
   the server only ever sees ciphertext.
@@ -118,9 +138,11 @@ Message content is end-to-end encrypted in transit and at rest:
 - **Metadata stays plaintext** because threads, polls, and pins rely on JSONB
   queries and merge-updates.
 
-**Known limitation:** encryption engages once both partners have published
+**Known limitations:** encryption engages once both partners have published
 keys; messages sent before then remain legacy plaintext, and rotating a device
-key would make older history unreadable.
+key would make older history unreadable. To detect a swapped public key
+(MITM), partners compare the key fingerprints shown in **Settings →
+Encryption** (SEC-15b).
 
 ## Background Sync
 
@@ -180,6 +202,10 @@ condensed form (details resolved in code + migrations):
 | SEC-11 | Stale pairing cache resurrection | Authoritative null clears cache |
 | SEC-12 | Partner FCM token readable | Deferred (SDK limits); see code comment |
 | SEC-13 | No E2EE despite UI claims | Real X25519 + AES-256-GCM E2EE + honest copy |
+| SEC-14 | Public media buckets (anyone with URL) | Buckets private, auth-scoped reads, signed URLs |
+| SEC-15 | E2EE key in plaintext SharedPreferences | Secure storage + legacy migration |
+| SEC-15b | No MITM detection | Public-key fingerprint comparison in Settings |
+| SEC-16 | Firebase API key committed to git | google-services.json ignored + template + docs |
 | PERF-01 | N+1 reaction subscriptions | Single `watchAllReactions()` stream |
 | PERF-02 | Cache writes on every event | 2s throttled cache write |
 | PERF-03 | Read-marking write amplification | RPC only when unread messages present |

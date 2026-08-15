@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../services/encryption_service.dart';
 import '../services/supabase_service.dart';
+import '../widgets/secure_media_image.dart';
 
 const _kBgDark = Color(0xFF09090B);
 const _kBgLight = Color(0xFFF4F4F5);
@@ -132,6 +133,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           subtitle: 'View recent shared alerts and updates',
                           onTap: () => context.push('/notifications'),
                         ),
+                      ]),
+                      const SizedBox(height: 24),
+                      _buildSection('ENCRYPTION (VERIFIED)', [
+                        const _EncryptionSection(),
                       ]),
                       const SizedBox(height: 24),
                       _buildSection('SUPPORT', [
@@ -267,8 +272,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child:
                           profile?.avatarUrl != null &&
                               profile!.avatarUrl!.isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: profile.avatarUrl!,
+                          ? SecureMediaImage(
+                              value: profile.avatarUrl!,
                               fit: BoxFit.cover,
                             )
                           : Icon(
@@ -957,4 +962,209 @@ class _GlowBlob extends StatelessWidget {
       gradient: RadialGradient(colors: [color, Colors.transparent]),
     ),
   );
+}
+
+/// Shows the device's E2EE public-key fingerprint and the partner's, so both
+/// partners can verify (out of band) that the chat key has not been swapped.
+class _EncryptionSection extends StatefulWidget {
+  const _EncryptionSection();
+
+  @override
+  State<_EncryptionSection> createState() => _EncryptionSectionState();
+}
+
+class _EncryptionSectionState extends State<_EncryptionSection> {
+  String? _myCode;
+  String? _partnerCode;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final myCode = await EncryptionService.instance.myFingerprint();
+      String? partnerCode;
+      try {
+        final pairing = await SupabaseService().getActivePairing();
+        if (pairing != null) {
+          partnerCode = await EncryptionService.instance
+              .partnerFingerprint(pairing.id);
+        }
+      } catch (_) {
+        partnerCode = null;
+      }
+      if (mounted) {
+        setState(() {
+          _myCode = myCode;
+          _partnerCode = partnerCode;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = '$e');
+    }
+  }
+
+  void _copy(String value) {
+    Clipboard.setData(ClipboardData(text: value));
+    HapticFeedback.selectionClick();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textCol = Colors.white;
+    final muted = Colors.white.withValues(alpha: 0.4);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.04),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.lock_rounded,
+                  color: _kAccentPurple,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Messages are end-to-end encrypted',
+                      style: TextStyle(
+                        color: textCol,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Compare these codes with your partner in person to '
+                      'confirm your chat is private.',
+                      style: TextStyle(
+                        color: muted,
+                        fontSize: 13,
+                        height: 1.4,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _CodeRow(
+            label: 'Your code',
+            code: _myCode,
+            onCopy: _myCode == null ? null : () => _copy(_myCode!),
+          ),
+          const SizedBox(height: 10),
+          _CodeRow(
+            label: "Partner's code",
+            code: _partnerCode,
+            onCopy: _partnerCode == null ? null : () => _copy(_partnerCode!),
+            emptyText: 'Pair to see your partner\'s code',
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Could not load codes: $_error',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.6),
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CodeRow extends StatelessWidget {
+  const _CodeRow({
+    required this.label,
+    required this.code,
+    this.onCopy,
+    this.emptyText,
+  });
+
+  final String label;
+  final String? code;
+  final VoidCallback? onCopy;
+  final String? emptyText;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.4),
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Material(
+          color: Colors.white.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(14),
+          child: InkWell(
+            onTap: onCopy,
+            borderRadius: BorderRadius.circular(14),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: code == null
+                        ? Text(
+                            emptyText ?? 'Loading…',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.4),
+                              fontSize: 13,
+                            ),
+                          )
+                        : Text(
+                            code!,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontFamily: 'monospace',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                  ),
+                  if (onCopy != null)
+                    Icon(
+                      Icons.copy_rounded,
+                      color: Colors.white.withValues(alpha: 0.3),
+                      size: 16,
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }

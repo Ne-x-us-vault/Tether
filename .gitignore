@@ -58,6 +58,11 @@ android/build/
 ios/Flutter/Generated.xcconfig
 ios/Flutter/flutter_export_environment.sh
 
+# Firebase config: real file contains a Google API key and must NOT be
+# committed to a public repo. Keep it local; a placeholder template lives at
+# android/app/google-services.json.example.
+android/app/google-services.json
+
 # Android signing keys (never commit)
 *.jks
 *.keystore

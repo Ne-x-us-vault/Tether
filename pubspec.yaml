@@ -53,6 +53,7 @@ dependencies:
 
   # ── End-to-end encryption ─────────────────────────────────────────────────
   cryptography: ^2.7.0             # X25519 key exchange + AES-256-GCM
+  flutter_secure_storage: ^9.2.4   # E2EE private key storage (keystore/Keychain)
 
 dev_dependencies:
   flutter_test:

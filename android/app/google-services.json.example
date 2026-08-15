@@ -1,0 +1,42 @@
+{
+  // ══════════════════════════════════════════════════════════════════════════
+  // TEMPLATE — copy this file to google-services.json and fill in YOUR values.
+  //
+  //   cp android/app/google-services.json.example android/app/google-services.json
+  //
+  // The real google-services.json contains a Google API key and is git-ignored.
+  // Create your own Firebase project and add your Android app (package name
+  // matching `applicationId` in android/app/build.gradle.kts) to generate a
+  // real file from Firebase Console → Project settings → Your apps.
+  //
+  // SECURITY: keep this file OUT of git. Restrict the API key in Firebase
+  // Console (Android package + SHA-1) and rotate it if it ever leaked.
+  // ══════════════════════════════════════════════════════════════════════════
+  "project_info": {
+    "project_number": "PASTE_YOUR_PROJECT_NUMBER",
+    "project_id": "PASTE_YOUR_PROJECT_ID",
+    "storage_bucket": "PASTE_YOUR_STORAGE_BUCKET"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "PASTE_YOUR_APP_ID",
+        "android_client_info": {
+          "package_name": "com.example.lovit"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "PASTE_YOUR_ANDROID_API_KEY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
