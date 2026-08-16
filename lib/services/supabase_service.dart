@@ -2042,28 +2042,30 @@ class SupabaseService {
   // TASKS
   // ────────────────────────────────────────────────────────────────────────────
 
+  /// Soft-deletes every message in a thread for BOTH partners (shared clear,
+  /// SEC-19). Any UI calling this MUST confirm with the user first.
   Future<void> clearChatThread({
     required String pairingId,
     required String threadId,
   }) async {
-    await client
-        .from('messages')
-        .update({
-          'is_deleted': true,
-          'deleted_at': DateTime.now().toUtc().toIso8601String(),
-        })
-        .eq('pairing_id', pairingId)
-        .contains('metadata', {'thread_id': threadId});
+    await client.rpc('clear_chat_thread_messages', params: {
+      'p_pairing_id': pairingId,
+      'p_thread_id': threadId,
+    });
   }
 
+  /// Permanently deletes a thread for BOTH partners (SEC-19). The guarded RPC
+  /// refuses to hard-delete unless the thread has already been fully cleared,
+  /// so live messages can never be destroyed by a single call. Any UI calling
+  /// this MUST warn that it removes the thread for both partners.
   Future<void> deleteChatThread({
     required String pairingId,
     required String threadId,
   }) async {
-    await client.from('messages').delete().eq('pairing_id', pairingId).contains(
-      'metadata',
-      {'thread_id': threadId},
-    );
+    await client.rpc('delete_chat_thread_messages', params: {
+      'p_pairing_id': pairingId,
+      'p_thread_id': threadId,
+    });
   }
 
   Future<Task> createTask({
