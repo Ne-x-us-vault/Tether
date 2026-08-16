@@ -137,6 +137,10 @@ test/                       Unit tests
 - FCM push tokens are device secrets and never appear on the partner-readable
   `profiles` row: they live in a private `push_tokens` table that only the
   owner can write and only the edge function (service role) can read (SEC-17).
+- Thread clear/delete is shared by design (either partner can act on the whole
+  thread), but guarded (SEC-19): clearing is a recoverable soft-delete, and a
+  thread can only be hard-deleted after it has been fully cleared, so one
+  partner can never destroy live shared history with a single call.
 
 ### End-to-End Encryption (messages)
 
@@ -227,6 +231,7 @@ condensed form (details resolved in code + migrations):
 | SEC-16b | Placeholder `com.example.lovit` applicationId | Renamed to `com.lovit.app` (Android + iOS) |
 | SEC-17 | Partner FCM token readable (SEC-12) | Token moved to private `push_tokens` table; owner-write, service-read |
 | SEC-18 | Edge function leaks internal errors | Generic responses; details logged server-side |
+| SEC-19 | Partner can hard-delete a whole thread | Shared clear stays; hard-delete only after full clear (guarded RPC) |
 | PERF-01 | N+1 reaction subscriptions | Single `watchAllReactions()` stream |
 | PERF-02 | Cache writes on every event | 2s throttled cache write |
 | PERF-03 | Read-marking write amplification | RPC only when unread messages present |
