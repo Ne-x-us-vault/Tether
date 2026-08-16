@@ -111,7 +111,10 @@ async function getFirebaseAccessToken(
   })
 
   const json = await res.json()
-  if (!json.access_token) throw new Error(`OAuth token error: ${JSON.stringify(json)}`)
+  if (!json.access_token) {
+    console.error('OAuth token error:', res.status, JSON.stringify(json))
+    throw new Error('Failed to obtain Firebase access token')
+  }
   return json.access_token
 }
 
@@ -220,19 +223,21 @@ serve(async (req: Request) => {
     })
 
     // ── 6. Send FCM (skip gracefully if recipient has no token) ─────────────
-    const { data: profileData, error } = await admin
-      .from('profiles')
-      .select('push_token')
-      .eq('id', toUserId)
-      .single()
+    // push_token lives in the private push_tokens table (SEC-17): only the
+    // owner can write their own row and only the service role can read it.
+    const { data: tokenData, error } = await admin
+      .from('push_tokens')
+      .select('token')
+      .eq('user_id', toUserId)
+      .maybeSingle()
 
-    const profile = profileData as { push_token: string | null } | null
-    if (error || !profile?.push_token) {
+    const tokenRow = tokenData as { token: string } | null
+    if (error || !tokenRow?.token) {
       console.log(`No push token for user ${toUserId} - skipped FCM but logged in DB`)
       return jsonResponse(200, { success: true, logged_db: true, reason: 'no_token' })
     }
 
-    const fcmToken: string = profile.push_token
+    const fcmToken: string = tokenRow.token
     const projectId = Deno.env.get('FCM_PROJECT_ID')!
     const clientEmail = Deno.env.get('FCM_CLIENT_EMAIL')!
     const privateKey = Deno.env.get('FCM_PRIVATE_KEY')!.replace(/\\n/g, '\n')
@@ -272,14 +277,14 @@ serve(async (req: Request) => {
 
     const fcmJson = await fcmRes.json()
     if (!fcmRes.ok) {
-      console.error('FCM error:', JSON.stringify(fcmJson))
-      return jsonResponse(500, { error: fcmJson })
+      console.error('FCM error:', fcmRes.status, JSON.stringify(fcmJson))
+      return jsonResponse(502, { error: 'Push provider unavailable' })
     }
 
     console.log(`[Push] Sent ${type} to ${toUserId}: ${fcmJson.name}`)
     return jsonResponse(200, { success: true, name: fcmJson.name })
   } catch (err) {
     console.error('Edge function error:', err)
-    return jsonResponse(500, { error: String(err) })
+    return jsonResponse(500, { error: 'Internal error' })
   }
 })

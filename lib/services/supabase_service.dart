@@ -31,7 +31,6 @@ class UserProfile {
   final double? currentLatitude;
   final double? currentLongitude;
   final DateTime? locationLastUpdated;
-  final String? pushToken;
   final Map<String, dynamic> preferences;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -50,7 +49,6 @@ class UserProfile {
     this.currentLatitude,
     this.currentLongitude,
     this.locationLastUpdated,
-    this.pushToken,
     this.preferences = const {},
     required this.createdAt,
     required this.updatedAt,
@@ -90,7 +88,6 @@ class UserProfile {
       locationLastUpdated: json['location_last_updated'] != null
           ? DateTime.parse(json['location_last_updated'])
           : null,
-      pushToken: json['push_token'],
       preferences: json['preferences'] ?? {},
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: updatedAt,
@@ -113,7 +110,6 @@ class UserProfile {
     'current_latitude': currentLatitude,
     'current_longitude': currentLongitude,
     'location_last_updated': locationLastUpdated?.toIso8601String(),
-    'push_token': pushToken,
     'preferences': preferences,
     'created_at': createdAt.toIso8601String(),
     'updated_at': updatedAt.toIso8601String(),
@@ -133,7 +129,6 @@ class UserProfile {
     double? currentLatitude,
     double? currentLongitude,
     DateTime? locationLastUpdated,
-    String? pushToken,
     Map<String, dynamic>? preferences,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -153,7 +148,6 @@ class UserProfile {
       currentLatitude: currentLatitude ?? this.currentLatitude,
       currentLongitude: currentLongitude ?? this.currentLongitude,
       locationLastUpdated: locationLastUpdated ?? this.locationLastUpdated,
-      pushToken: pushToken ?? this.pushToken,
       preferences: preferences ?? this.preferences,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -963,15 +957,16 @@ class SupabaseService {
     });
   }
 
-  /// Saves the FCM push token to the current user's profile row.
+  /// Saves the FCM push token to the private push_tokens table (SEC-17).
+  /// The token is no longer stored on the public-readable profiles row.
   Future<void> saveFcmToken(String token) async {
     if (currentUserId == null) return;
     try {
-      await _ensureProfileRow();
-      await client
-          .from('profiles')
-          .update({'push_token': token})
-          .eq('id', currentUserId!);
+      await client.from('push_tokens').upsert({
+        'user_id': currentUserId!,
+        'token': token,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      });
       debugPrint('[FCM] Token saved to Supabase');
     } catch (e) {
       debugPrint('[FCM] Token save error: $e');

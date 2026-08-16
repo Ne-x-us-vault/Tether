@@ -92,6 +92,20 @@ test/                       Unit tests
    The Google services Gradle plugin fails the build if the real file is
    missing, so anyone cloning the repo must provide their own.
 
+   The app's application ID is **`com.lovit.app`** (Android `applicationId` and
+   iOS bundle identifier — no longer the `com.example` placeholder, SEC-16b).
+   When you first set up or regenerate the Firebase config for this package:
+
+   - **Project settings → Your apps → Android app → Add app** with the package
+     name `com.lovit.app` (add your signing certificate's **SHA-1** for
+     fingerprint verification), download the new `google-services.json` and
+     replace the local file.
+   - **Project settings → API keys** → restrict the Android key to
+     **Android apps: `com.lovit.app`** (+ your SHA-1). The key ships inside
+     every APK, so restriction is what makes it useless if extracted.
+   - If the key was ever exposed (it was committed to git history before
+     SEC-16), **regenerate** it in the console.
+
 4. **Run**
 
    ```sh
@@ -118,7 +132,11 @@ test/                       Unit tests
 - Push notifications are sent via the `send-notification` edge function, which
   verifies the caller's JWT, rejects sends without an active pairing, validates
   UUIDs before building filters, and rate-limits. Notification bodies never
-  echo message content.
+  echo message content, and failures return generic errors while details are
+  logged server-side (SEC-18).
+- FCM push tokens are device secrets and never appear on the partner-readable
+  `profiles` row: they live in a private `push_tokens` table that only the
+  owner can write and only the edge function (service role) can read (SEC-17).
 
 ### End-to-End Encryption (messages)
 
@@ -200,12 +218,15 @@ condensed form (details resolved in code + migrations):
 | SEC-09 | Debug surface in release builds | kDebugMode-gated route + no anon login |
 | SEC-10 | Predictable Jitsi room names | Random nonce in room name |
 | SEC-11 | Stale pairing cache resurrection | Authoritative null clears cache |
-| SEC-12 | Partner FCM token readable | Deferred (SDK limits); see code comment |
+| SEC-12 | Partner FCM token readable | Superseded by SEC-17 |
 | SEC-13 | No E2EE despite UI claims | Real X25519 + AES-256-GCM E2EE + honest copy |
 | SEC-14 | Public media buckets (anyone with URL) | Buckets private, auth-scoped reads, signed URLs |
 | SEC-15 | E2EE key in plaintext SharedPreferences | Secure storage + legacy migration |
 | SEC-15b | No MITM detection | Public-key fingerprint comparison in Settings |
 | SEC-16 | Firebase API key committed to git | google-services.json ignored + template + docs |
+| SEC-16b | Placeholder `com.example.lovit` applicationId | Renamed to `com.lovit.app` (Android + iOS) |
+| SEC-17 | Partner FCM token readable (SEC-12) | Token moved to private `push_tokens` table; owner-write, service-read |
+| SEC-18 | Edge function leaks internal errors | Generic responses; details logged server-side |
 | PERF-01 | N+1 reaction subscriptions | Single `watchAllReactions()` stream |
 | PERF-02 | Cache writes on every event | 2s throttled cache write |
 | PERF-03 | Read-marking write amplification | RPC only when unread messages present |
