@@ -7,10 +7,10 @@
 // Replace <your_package_name> with your actual package.
 // To find it: open android/app/build.gradle and look for applicationId.
 // Example: if applicationId = "com.example.lovit"
-//   → file lives at android/app/src/main/kotlin/com/example/lovit/MainActivity.kt
+//   → file lives at android/app/src/main/kotlin/com/lovit/app/MainActivity.kt
 // ══════════════════════════════════════════════════════════════════════════════
 
-package com.example.lovit   // ← change this to match your applicationId
+package com.lovit.app   // ← change this to match your applicationId
 
 import android.content.Intent
 import android.provider.Settings

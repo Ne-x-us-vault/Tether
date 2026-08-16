@@ -6,8 +6,8 @@
   //
   // The real google-services.json contains a Google API key and is git-ignored.
   // Create your own Firebase project and add your Android app (package name
-  // matching `applicationId` in android/app/build.gradle.kts) to generate a
-  // real file from Firebase Console → Project settings → Your apps.
+  // matching `applicationId` = com.lovit.app in android/app/build.gradle.kts)
+  // to generate a real file from Firebase Console → Project settings → Your apps.
   //
   // SECURITY: keep this file OUT of git. Restrict the API key in Firebase
   // Console (Android package + SHA-1) and rotate it if it ever leaked.
@@ -22,7 +22,7 @@
       "client_info": {
         "mobilesdk_app_id": "PASTE_YOUR_APP_ID",
         "android_client_info": {
-          "package_name": "com.example.lovit"
+          "package_name": "com.lovit.app"
         }
       },
       "oauth_client": [],
