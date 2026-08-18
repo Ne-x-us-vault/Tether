@@ -109,7 +109,7 @@ class _AnimatedAuroraState extends State<AnimatedAurora>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 8),
+      duration: const Duration(seconds: 20),
     )..repeat(reverse: true);
 
     _opacity = Tween<double>(begin: 0.04, end: 0.12).animate(

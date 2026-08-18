@@ -855,6 +855,12 @@ class _ChatScreenState extends State<ChatScreen>
   String? _openQuickPickerId;
   // ignore: unused_field
   String? _openFullPickerId;
+
+  // Composer emoji picker state — ValueNotifier so only the panel rebuilds,
+  // not the entire chat screen / composer bar.
+  final ValueNotifier<bool> _showComposerEmoji = ValueNotifier(false);
+  final ValueNotifier<int> _composerEmojiCat = ValueNotifier(0);
+  PageController? _composerEmojiPageCtrl;
   int _fullPickerCatIndex = 0;
   String _emojiSearchQ = '';
   final TextEditingController _emojiSearchCtrl = TextEditingController();
@@ -880,6 +886,11 @@ class _ChatScreenState extends State<ChatScreen>
       duration: const Duration(milliseconds: 4200),
     );
     _composerCtrl.addListener(_onComposerChanged);
+    _composerFocus.addListener(() {
+      if (_composerFocus.hasFocus && _showComposerEmoji.value) {
+        _showComposerEmoji.value = false;
+      }
+    });
     _scrollCtrl.addListener(_onScroll);
     _initializeChatAsync();
   }
@@ -2252,6 +2263,9 @@ class _ChatScreenState extends State<ChatScreen>
     _composerFocus.dispose();
     _scrollCtrl.dispose();
     _glowCtrl.dispose();
+    _showComposerEmoji.dispose();
+    _composerEmojiCat.dispose();
+    _composerEmojiPageCtrl?.dispose();
     _messageSub?.cancel();
     _profileSub?.cancel();
     _presenceSub?.cancel();
@@ -2369,8 +2383,24 @@ class _ChatScreenState extends State<ChatScreen>
                 ],
               ),
             ),
-            // Floating composer at bottom
-            Positioned(left: 0, right: 0, bottom: 0, child: _buildComposer()),
+            // Composer + emoji panel at bottom
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildComposer(),
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    clipBehavior: Clip.hardEdge,
+                    child: _buildComposerEmojiPanel(),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -3230,9 +3260,10 @@ class _ChatScreenState extends State<ChatScreen>
   // ─────────────────────────────────────────────────────────────────────────
 
   Widget _buildComposer() {
-    // Avoid reading viewInsets.bottom here to completely prevent the entire ChatScreen
-    // widget tree from rebuilding on every single frame of the keyboard animation.
-    final safeBottom = MediaQuery.of(context).padding.bottom;
+    // Use viewPadding (not padding) so the 3-button Android nav bar is
+    // accounted for. viewPadding is static and won't cause rebuilds during
+    // keyboard animation (unlike viewInsets).
+    final safeBottom = MediaQuery.of(context).viewPadding.bottom;
     final extraBottom = safeBottom > 0 ? 12.0 : 8.0;
 
     return Container(
@@ -3271,12 +3302,19 @@ class _ChatScreenState extends State<ChatScreen>
               ),
               child: Row(
                 children: [
-                  IconButton(
-                    icon: Icon(
-                      Icons.emoji_emotions_outlined,
-                      color: Colors.white.withValues(alpha: 0.65),
+                  ValueListenableBuilder<bool>(
+                    valueListenable: _showComposerEmoji,
+                    builder: (context, showEmoji, _) => IconButton(
+                      icon: Icon(
+                        showEmoji
+                            ? Icons.keyboard_rounded
+                            : Icons.emoji_emotions_outlined,
+                        color: showEmoji
+                            ? const Color(0xFF7C5FCC)
+                            : Colors.white.withValues(alpha: 0.65),
+                      ),
+                      onPressed: _toggleComposerEmoji,
                     ),
-                    onPressed: () => _composerFocus.requestFocus(),
                   ),
                   Expanded(
                     child: _isRecording
@@ -3393,6 +3431,119 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   // ─────────────────────────────────────────────────────────────────────────
+  // COMPOSER EMOJI PICKER (inline panel)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  void _toggleComposerEmoji() {
+    final opening = !_showComposerEmoji.value;
+    _showComposerEmoji.value = opening;
+    if (!opening) {
+      // Switching back to keyboard
+      _composerFocus.requestFocus();
+    } else {
+      // Switching to emoji panel — dismiss keyboard
+      _composerFocus.unfocus();
+    }
+  }
+
+  Widget _buildComposerEmojiPanel() {
+    return ValueListenableBuilder<bool>(
+      valueListenable: _showComposerEmoji,
+      builder: (context, show, _) {
+        if (!show) return const SizedBox(height: 0, width: double.infinity);
+        final cats = _kEmojiCategories;
+        _composerEmojiPageCtrl ??= PageController();
+        final pageCtrl = _composerEmojiPageCtrl!;
+
+        return Container(
+          height: 300,
+          color: const Color(0xFF1E1E1E),
+          child: Column(
+            children: [
+              // Category tabs
+              SizedBox(
+                height: 44,
+                child: ValueListenableBuilder<int>(
+                  valueListenable: _composerEmojiCat,
+                  builder: (context, selectedCat, _) => ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    itemCount: cats.length,
+                    itemBuilder: (_, i) {
+                      final isActive = i == selectedCat;
+                      return GestureDetector(
+                        onTap: () {
+                          _composerEmojiCat.value = i;
+                          pageCtrl.animateToPage(i,
+                            duration: const Duration(milliseconds: 180),
+                            curve: Curves.fastOutSlowIn);
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          margin: const EdgeInsets.symmetric(horizontal: 3),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                          decoration: isActive
+                              ? BoxDecoration(
+                                  color: const Color(0xFF7C5FCC).withValues(alpha: 0.22),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: const Color(0xFF7C5FCC).withValues(alpha: 0.45),
+                                    width: 0.8,
+                                  ),
+                                )
+                              : null,
+                          alignment: Alignment.center,
+                          child: Text(cats[i]['icon'] as String,
+                              style: TextStyle(fontSize: isActive ? 20 : 17)),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              Container(height: 0.5, color: Colors.white.withValues(alpha: 0.10)),
+              // Emoji grid
+              Expanded(
+                child: PageView.builder(
+                  controller: pageCtrl,
+                  itemCount: cats.length,
+                  onPageChanged: (i) => _composerEmojiCat.value = i,
+                  itemBuilder: (_, catI) {
+                    final ems = List<String>.from(cats[catI]['emojis'] as List);
+                    return GridView.builder(
+                      padding: const EdgeInsets.all(8),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 8,
+                        mainAxisSpacing: 4,
+                        crossAxisSpacing: 4,
+                      ),
+                      itemCount: ems.length,
+                      itemBuilder: (_, i) => GestureDetector(
+                        onTap: () {
+                          final text = _composerCtrl.text;
+                          final sel = _composerCtrl.selection;
+                          final start = sel.isValid ? sel.start : text.length;
+                          final end = sel.isValid ? sel.end : text.length;
+                          _composerCtrl.text =
+                              '${text.substring(0, start)}${ems[i]}${text.substring(end)}';
+                          _composerCtrl.selection =
+                              TextSelection.collapsed(offset: start + ems[i].length);
+                        },
+                        child: Center(
+                            child: Text(ems[i], style: const TextStyle(fontSize: 22))),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
   // ATTACHMENT MENU
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -3408,7 +3559,7 @@ class _ChatScreenState extends State<ChatScreen>
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(32, 32, 32, 40),
             decoration: BoxDecoration(
-              color: const Color(0xEC0A0A12), // Midnight Obsidian Dark Glass
+              color: const Color(0xEC0A0A12),
               border: Border(
                 top: BorderSide(
                   color: Colors.white.withValues(alpha: 0.08),
@@ -3440,6 +3591,24 @@ class _ChatScreenState extends State<ChatScreen>
                   },
                 ),
                 _buildAttachmentOption(
+                  icon: Icons.gif_box_rounded,
+                  color: const Color(0xFFE91E63),
+                  label: 'GIF',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickAndSendGif();
+                  },
+                ),
+                _buildAttachmentOption(
+                  icon: Icons.emoji_emotions_rounded,
+                  color: const Color(0xFFFF9800),
+                  label: 'Sticker',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showStickerPicker();
+                  },
+                ),
+                _buildAttachmentOption(
                   icon: Icons.poll_rounded,
                   color: const Color(0xFFF59E0B),
                   label: 'Poll',
@@ -3454,6 +3623,111 @@ class _ChatScreenState extends State<ChatScreen>
         ),
       ),
     );
+  }
+
+  Future<void> _pickAndSendGif() async {
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['gif'],
+      );
+      if (result == null || result.files.single.path == null) return;
+      final path = result.files.single.path!;
+      _sendMediaMessage(path, 'image', 'image/gif');
+    } catch (e) {
+      _showIGToast('Error picking GIF');
+    }
+  }
+
+  static const _kStickers = [
+    '😍', '🥰', '😘', '😻', '🔥', '💕', '😂', '🥺',
+    '😢', '😭', '🙈', '🙉', '🙊', '💝', '💖', '💗',
+    '💓', '💞', '🤗', '😎', '🤩', '🥳', '🫶', '✨',
+    '❤️', '🧡', '💛', '💚', '💙', '💜', '🤍', '🖤',
+    '👏', '🙌', '💪', '🤝', '👋', '✌️', '🤞', '🙏',
+    '😢', '😡', '🤯', '😴', '🫡', '💅', '🌹', '⭐',
+  ];
+
+  void _showStickerPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        child: Container(
+          height: MediaQuery.of(context).size.height * 0.40,
+          decoration: const BoxDecoration(
+            color: Color(0xFF1E1E1E),
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 10),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  'Stickers',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Container(height: 0.5, color: Colors.white.withValues(alpha: 0.10)),
+              Expanded(
+                child: GridView.builder(
+                  padding: const EdgeInsets.all(12),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 5,
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
+                  ),
+                  itemCount: _kStickers.length,
+                  itemBuilder: (_, i) => GestureDetector(
+                    onTap: () {
+                      Navigator.pop(context);
+                      _sendStickerMessage(_kStickers[i]);
+                    },
+                    child: Center(
+                      child: Text(_kStickers[i], style: const TextStyle(fontSize: 36)),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _sendStickerMessage(String sticker) async {
+    if (_pairing == null) return;
+    await _sb.sendMessage(
+      pairingId: _pairing!.id,
+      messageType: 'sticker',
+      content: sticker,
+    );
+    _scrollToBottom();
+    if (_partner?.id != null) {
+      final senderName =
+          _partner?.preferences['partner_nickname'] ??
+          _myProfile?.displayName ??
+          'Someone';
+      _maybeSendMessagePush(
+        title: '💜 $senderName',
+        body: 'Sent a sticker',
+      );
+    }
   }
 
   Future<void> _sendPollMessage(String question, List<String> options) async {
@@ -4191,6 +4465,15 @@ class _IGMessageBubbleState extends State<_IGMessageBubble> {
   }
 
   Widget _buildMainBubble(bool isPending) {
+    // Stickers render without bubble chrome
+    if (widget.message.messageType == 'sticker') {
+      return Padding(
+        key: widget.bubbleKey,
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        child: _buildBubbleContent(isPending),
+      );
+    }
+
     final borderRadius = BorderRadius.only(
       topLeft: Radius.circular(
         widget.isSent ? _IG.radiusBubble : _IG.radiusBubbleTail,
@@ -4419,6 +4702,26 @@ class _IGMessageBubbleState extends State<_IGMessageBubble> {
 
     if (isPoll) {
       return _buildPollBubble(timestamp);
+    }
+
+    // Sticker — render large emoji without bubble chrome
+    if (widget.message.messageType == 'sticker' &&
+        widget.message.content != null) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            widget.message.content!,
+            style: const TextStyle(fontSize: 72),
+          ),
+          const SizedBox(width: 4),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: timestamp,
+          ),
+        ],
+      );
     }
 
     return Column(
@@ -6101,12 +6404,14 @@ class _MediaPageState extends State<_MediaPage> {
     'image',
     'video',
     'audio',
+    'sticker',
     'file',
   ];
   static const Map<String, IconData> _typeIcons = {
     'image': Icons.image_rounded,
     'video': Icons.videocam_rounded,
     'audio': Icons.audiotrack_rounded,
+    'sticker': Icons.emoji_emotions_rounded,
     'file': Icons.insert_drive_file_rounded,
   };
 

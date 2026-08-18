@@ -35,6 +35,7 @@ class SecureMediaImage extends StatefulWidget {
 
 class _SecureMediaImageState extends State<SecureMediaImage> {
   late Future<String> _urlFuture;
+  bool _isLocalFile = false;
 
   @override
   void initState() {
@@ -46,6 +47,7 @@ class _SecureMediaImageState extends State<SecureMediaImage> {
   void didUpdateWidget(covariant SecureMediaImage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.value != widget.value) {
+      _isLocalFile = false;
       _urlFuture = _resolve();
     }
   }
@@ -53,8 +55,14 @@ class _SecureMediaImageState extends State<SecureMediaImage> {
   Future<String> _resolve() async {
     final value = widget.value;
     if (value.isEmpty) return value;
-    if (!value.startsWith('http') && File(value).existsSync()) {
-      return value;
+    if (!value.startsWith('http')) {
+      try {
+        final exists = await File(value).exists();
+        if (exists && mounted) {
+          _isLocalFile = true;
+          return value;
+        }
+      } catch (_) {}
     }
     return SupabaseService().secureMediaUrl(value);
   }
@@ -68,7 +76,7 @@ class _SecureMediaImageState extends State<SecureMediaImage> {
     if (value.isEmpty) return fallback;
 
     // Local file (pending upload) — render straight from disk.
-    if (!value.startsWith('http') && File(value).existsSync()) {
+    if (_isLocalFile) {
       return Image.file(
         File(value),
         fit: widget.fit,
@@ -84,6 +92,16 @@ class _SecureMediaImageState extends State<SecureMediaImage> {
         final url = snapshot.data;
         if (url == null || url.isEmpty) {
           return widget.placeholder ?? const SizedBox.shrink();
+        }
+        // If resolved to a local file path, render from disk.
+        if (_isLocalFile) {
+          return Image.file(
+            File(url),
+            fit: widget.fit,
+            width: widget.width,
+            height: widget.height,
+            errorBuilder: (_, _, _) => fallback,
+          );
         }
         return CachedNetworkImage(
           imageUrl: url,

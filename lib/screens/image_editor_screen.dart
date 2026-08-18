@@ -52,7 +52,9 @@ class DrawPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(covariant DrawPainter oldDelegate) =>
+      oldDelegate.paths.length != paths.length ||
+      oldDelegate.paths != paths;
 }
 
 // Sleek Crop overlay custom painter that draws a dark semi-transparent mask and corner anchors
