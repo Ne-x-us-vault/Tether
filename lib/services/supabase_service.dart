@@ -1318,11 +1318,7 @@ class SupabaseService {
     String pairingId,
     List<Message> messages,
   ) async {
-    final out = <Message>[];
-    for (final message in messages) {
-      out.add(await _decryptMessage(message));
-    }
-    return out;
+    return Future.wait(messages.map(_decryptMessage));
   }
 
   Future<UserProfile> updateProfile({
