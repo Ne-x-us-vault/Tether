@@ -4,22 +4,44 @@ A private, realtime couples app built with **Flutter** and **Supabase**.
 
 Lovit gives partners a shared space for chat (end-to-end encrypted), a shared
 calendar & period tracker, tasks, budgets, cycle tracking, location sharing,
-voice notes, and video calls.
+voice notes, video calls, and more.
 
 ## Features
 
 - **Chat** — realtime 1:1 messaging with reactions, edits, unsend, pinned
-  messages, voice notes, media, and a customizable background (preset colors or
-  a custom image).
-- **Calendar** — shared events and period/cycle tracking synced between
-  partners across timezones (all timestamps stored UTC).
-- **Budget** — shared monthly expense tracker.
-- **Tasks** — shared to-dos.
-- **Maps** — realtime location sharing with an explicit opt-out.
-- **Presence & battery** — partner online status and battery level synced in
+  messages, threaded conversations, voice notes, images, drawing/doodle canvas,
+  file attachments, polls, and a customizable background (preset colors or a
+  custom image).
+- **Polls** — create and vote on polls directly inside chat (single-choice or
+  multi-choice, with live vote counts).
+- **Calendar** — shared events with color coding, recurring events, and
+  reminders synced between partners across timezones (all timestamps stored
+  UTC).
+- **Cycle Tracking** — period logging with flow level, symptoms, mood, fertile
+  window calculations, and upcoming-period push notification reminders.
+- **Budget** — shared monthly expense tracker with category tagging and
+  partner "paid by" attribution.
+- **Tasks** — shared to-dos with priority, assignment, due dates, tags, and
+  completion tracking.
+- **Maps** — realtime location sharing on `flutter_map` with an explicit
+  opt-out.
+- **Smart Meeting Suggestions** — when partners are within 12 km, Lovit
+  calculates a halfway point and suggests nearby cafes, restaurants, parks, and
+  theaters ranked by rating and distance (Google Places API).
+- **Presence & Battery** — partner online status and battery level synced in
   the background (including a background sync service).
-- **Video calls** — in-app Jitsi meet rooms.
-- **Pairing** — QR-code based pairing flow, enforced server-side.
+- **Video & Voice Calls** — in-app Jitsi Meet rooms.
+- **Memories** — a carousel of shared photos on the home screen, with a
+  private `memories` storage bucket for uploads.
+- **Notification Center** — typed in-app notifications (expense, task,
+  calendar, battery, period, memory, mood, chat, call, location) with
+  realtime updates and tap-to-navigate deep linking.
+- **Image Editor** — in-app drawing/doodle canvas and crop/rotate for chat
+  media.
+- **Onboarding** — 3-page animated intro with romantic imagery shown before
+  first login.
+- **Pairing** — QR-code based pairing flow (generate, scan, or manual code
+  entry), enforced server-side.
 
 ## Tech Stack
 
@@ -29,26 +51,74 @@ voice notes, and video calls.
 - **Backend**: Supabase (PostgreSQL + Realtime + Edge Functions + Storage).
 - **Crypto**: `cryptography` — X25519 key exchange + AES-256-GCM for message
   content (see [Security](#security)).
+- **Notable packages**: `table_calendar`, `image_picker` / `image_cropper`,
+  `camera`, `file_picker`, `record` (voice notes), `signature` (drawing
+  canvas), `mobile_scanner` / `qr_flutter`, `battery_plus`, `geolocator`,
+  `cached_network_image`, `shimmer`, `flutter_spinkit`, `connectivity_plus`,
+  `url_launcher`, `permission_handler`, `http` (Places API).
 
 ## Project Layout
 
 ```
 lib/
-  main.dart                 App entry, auth listener, HomeShell + navigation
-  core/                     Supabase credentials & shared constants
-  models/                   Data models (cycle, chat, calendar)
-  screens/                  Chat, calendar, home, budget, maps, pairing, ...
-  services/                 SupabaseService, sync + notification + encryption
-  theme/                    Theme presets & theme selector (theme.dart,
-                            theme_selector.dart, index.dart)
-  widgets/                  Shared widgets (message bubble, etc.)
+  main.dart                 App entry, auth listener, GoRouter, HomeShell + navigation
+  core/
+    constants/
+      supabase_constants.dart   Supabase URL & anon key
+  models/
+    cycle_models.dart        CycleInfo, period/fertile-day calculations
+    chat_models.dart         ChatThemeSpec, QuickMessageChipSpec, reaction emojis
+  screens/
+    onboarding_screen.dart   3-page animated intro
+    login_screen.dart        Email sign-in / sign-up
+    profile_setup_screen.dart  Partner nickname entry
+    pairing_screen.dart      QR generate/scan + manual code pairing
+    home_screen.dart         Dashboard: greeting, presence, battery, tasks,
+                             memories carousel, smart meeting suggestions
+    chat_list_screen.dart    Chat thread list + partner presence/typing
+    chat_screen.dart         Full messaging: text, image, voice, video, polls,
+                             reactions, threads, drawing, E2EE
+    calendar_screen.dart     Shared calendar + period/cycle tracker + reminders
+    budget_screen.dart       Shared monthly expense tracker
+    maps_screen.dart         Realtime location sharing with flutter_map
+    settings_screen.dart     Settings: dark mode, encryption fingerprint, account
+    notification_screen.dart Notification center with typed notifications
+    edit_profile_screen.dart Avatar upload/crop + nickname edit
+    image_editor_screen.dart Drawing/doodle canvas + crop/rotate
+    image_viewer_screen.dart Fullscreen pinch-to-zoom image viewer
+    pairing_debug_screen.dart  Dev-only pairing test harness (kDebugMode only)
+  services/
+    supabase_service.dart    Central singleton: auth, profiles, pairing, messages,
+                             tasks, calendar, budget, cycle, notifications, presence,
+                             typing, broadcast, cache, storage, signed URLs
+    encryption_service.dart  X25519 E2EE: key gen, ECDH, AES-256-GCM, fingerprints
+    notification_service.dart  FCM init, token mgmt, foreground/local notifications,
+                             tap-to-navigate deep linking
+    location_sync_service.dart  Foreground + Workmanager background location sync
+    battery_sync_service.dart  Foreground + Workmanager background battery sync
+    call_service.dart        Jitsi Meet voice/video call join, permissions
+    nearby_places_service.dart  Google Places API: "meet halfway" smart suggestions
+  theme/
+    theme.dart               ThemePresets (32 colors, 9 categories), ThemeColor model,
+                             IGDesignTokens
+    theme_selector.dart      ThemeSelectorPage: categorized color grid + image picker
+    index.dart               Barrel export
+  widgets/
+    glass.dart               LovitBackground (blurred aurora), AnimatedAurora,
+                             GlassPanel (glassmorphism)
+    lovit_scaffold.dart      Themed scaffold wrapper
+    lovit_theme.dart         LovitColors palette, LovitPrimaryButton
+    floating_nav_bar.dart    5-tab floating pill nav bar with animations, unread badge
+    secure_media_image.dart  Resolves storage paths to signed URLs for private buckets
 supabase/
   migrations/               SQL schema + RLS policies + realtime publications
-  functions/send-notification/  Edge function (push notifications)
+  functions/send-notification/  Edge function (push notifications via FCM HTTP v1)
 assets/
-  images/                   App art
+  images/                   App art (logo, splash, backgrounds)
   memories/                 User memories media
-test/                       Unit tests
+test/
+  cycle_models_test.dart    Unit tests for calendar-date normalization and cycle info
+  encryption_service_test.dart  Unit tests for E2EE round trip and key derivation
 ```
 
 ## Getting Started
@@ -186,23 +256,44 @@ Users customize the chat background with a preset color or a custom image.
 
 ## Navigation
 
-`HomeShell` (`lib/main.dart`) hosts a 5-page `PageView`:
+The app uses **GoRouter** with a redirect flow:
+
+1. First-run onboarding complete? → if not, `/initial_onboarding`
+2. Authenticated? → if not, `/`
+3. Profile setup done (partner nickname set)? → if not, `/profile_setup`
+4. Active pairing? → if not, `/pairing`
+5. All complete → `/home`
+
+| Route | Screen |
+|-------|--------|
+| `/initial_onboarding` | `OnboardingScreen` |
+| `/` | `LoginScreen` |
+| `/profile_setup` | `ProfileSetupScreen` |
+| `/pairing` | `PairingScreen` |
+| `/home` | `HomeShell` |
+| `/settings` | `SettingsScreen` |
+| `/notifications` | `NotificationScreen` |
+| `/edit_profile` | `EditProfileScreen` |
+| `/debug` | `PairingDebugScreen` (kDebugMode only) |
+
+`HomeShell` (`lib/main.dart`) hosts a 5-page `PageView` with a floating
+pill nav bar:
 
 ```
-0. HomeScreen       1. BudgetScreen   2. ChatLogScreen
+0. HomeScreen       1. BudgetScreen      2. ChatListScreen
 3. CalendarScreen   4. MapsScreen
 ```
 
-All tabs and home-screen shortcuts route through a single `_navigateToPage()`
-(320 ms, `easeInOut`). Chat threads push a separate `ChatScreen` route.
-Navigation is gated in release builds (`/debug` route is kDebugMode-only).
+All tabs and home-screen shortcuts route through a single `_navigateToPage()`.
+Chat threads push a separate `ChatScreen` route.
 
 ## Testing
 
 - `test/cycle_models_test.dart` — 7 unit tests over calendar-date
   normalization and cycle info (period/fertile-day boundaries, cycle wrapping).
-- `test/encryption_service_test.dart` — 5 unit tests over the E2EE round trip,
-  legacy passthrough, and key derivation.
+- `test/encryption_service_test.dart` — 8 unit tests over the E2EE round trip,
+  legacy passthrough, key derivation, fingerprint generation, and secure
+  storage migration.
 
 ## Resolution History
 
