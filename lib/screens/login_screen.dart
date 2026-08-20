@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:video_player/video_player.dart';
 import '../services/supabase_service.dart';
 
 const _kBgDark = Color(0xFF09090B);
@@ -44,6 +45,8 @@ class _LoginScreenState extends State<LoginScreen>
   late Animation<double> _floatAnim;
   late Animation<double> _rotateAnim;
 
+  late VideoPlayerController _videoController;
+
   @override
   void initState() {
     super.initState();
@@ -77,12 +80,25 @@ class _LoginScreenState extends State<LoginScreen>
     ).animate(CurvedAnimation(parent: _floatController, curve: Curves.linear));
 
     _animController.forward();
+
+    _videoController = VideoPlayerController.asset(
+      'assets/login_screen/animate_girl.mp4',
+    )
+      ..addListener(() {
+        if (mounted) setState(() {});
+      })
+      ..initialize().then((_) {
+        _videoController.setLooping(true);
+        _videoController.setVolume(0);
+        _videoController.play();
+      });
   }
 
   @override
   void dispose() {
     _animController.dispose();
     _floatController.dispose();
+    _videoController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -270,34 +286,37 @@ class _LoginScreenState extends State<LoginScreen>
       children: [
         SizedBox(height: MediaQuery.of(context).size.height * 0.08),
 
-        // Animated Logo/Icon Container
-        Transform(
-          alignment: Alignment.center,
-          transform: Matrix4.identity()
-            ..setEntry(3, 2, 0.001)
-            ..rotateX((_floatAnim.value - 0.5) * 0.3),
-          child: Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [_kPurpleViv.withValues(alpha: 0.3), _kPink.withValues(alpha: 0.2)],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: _kPurple.withValues(alpha: 0.4),
-                  blurRadius: 30,
-                  spreadRadius: 5,
+        // Animated Girl Video
+        ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: _videoController.value.isInitialized
+              ? SizedBox(
+                  width: 200,
+                  height: 200,
+                  child: FittedBox(
+                    fit: BoxFit.cover,
+                    child: SizedBox(
+                      width: _videoController.value.size.width,
+                      height: _videoController.value.size.height,
+                      child: VideoPlayer(_videoController),
+                    ),
+                  ),
+                )
+              : Container(
+                  width: 200,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [_kPurpleViv.withValues(alpha: 0.3), _kPink.withValues(alpha: 0.2)],
+                    ),
+                  ),
+                  child: Center(
+                    child: Icon(Icons.favorite_rounded, size: 50, color: _kPurpleViv),
+                  ),
                 ),
-              ],
-            ),
-            child: Center(
-              child: Icon(Icons.favorite_rounded, size: 50, color: _kPurpleViv),
-            ),
-          ),
         ),
 
         const SizedBox(height: 32),

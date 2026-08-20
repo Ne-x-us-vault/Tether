@@ -50,6 +50,7 @@ dependencies:
   shimmer: ^3.0.0
   cached_network_image: ^3.4.1
   flutter_spinkit: ^5.2.2
+  video_player: ^2.9.2
 
   # ── End-to-end encryption ─────────────────────────────────────────────────
   cryptography: ^2.7.0             # X25519 key exchange + AES-256-GCM
@@ -71,6 +72,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    - assets/login_screen/
     - assets/memories/
 
 flutter_native_splash:
