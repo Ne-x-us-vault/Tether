@@ -62,3 +62,8 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
     implementation("com.google.firebase:firebase-messaging-ktx")
 }
+
+// Resolve duplicate classes between video_player and jitsi_meet_flutter_sdk
+configurations.all {
+    exclude(group = "androidx.media3", module = "media3-exoplayer-rtsp")
+}
