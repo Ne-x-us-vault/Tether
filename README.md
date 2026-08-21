@@ -47,7 +47,9 @@ voice notes, video calls, and more.
 
 - **Frontend**: Flutter (Dart 3.11+), Riverpod, `supabase_flutter`,
   `go_router`, `flutter_map`, `jitsi_meet_flutter_sdk`, FCM +
-  `flutter_local_notifications`, `workmanager` background sync.
+  `flutter_local_notifications`, `workmanager` background sync,
+  `media_kit` + `media_kit_video` (looping video backgrounds),
+  `google_fonts` (Poppins).
 - **Backend**: Supabase (PostgreSQL + Realtime + Edge Functions + Storage).
 - **Crypto**: `cryptography` — X25519 key exchange + AES-256-GCM for message
   content (see [Security](#security)).
@@ -55,7 +57,8 @@ voice notes, video calls, and more.
   `camera`, `file_picker`, `record` (voice notes), `signature` (drawing
   canvas), `mobile_scanner` / `qr_flutter`, `battery_plus`, `geolocator`,
   `cached_network_image`, `shimmer`, `flutter_spinkit`, `connectivity_plus`,
-  `url_launcher`, `permission_handler`, `http` (Places API).
+  `url_launcher`, `permission_handler`, `http` (Places API),
+  `media_kit_libs_android_video` (native mpv on Android).
 
 ## Project Layout
 
@@ -70,7 +73,8 @@ lib/
     chat_models.dart         ChatThemeSpec, QuickMessageChipSpec, reaction emojis
   screens/
     onboarding_screen.dart   3-page animated intro
-    login_screen.dart        Email sign-in / sign-up
+    login_screen.dart        Full-screen looping video bg, claymorphism
+                             login form, email verification UI
     profile_setup_screen.dart  Partner nickname entry
     pairing_screen.dart      QR generate/scan + manual code pairing
     home_screen.dart         Dashboard: greeting, presence, battery, tasks,
@@ -115,6 +119,7 @@ supabase/
   functions/send-notification/  Edge function (push notifications via FCM HTTP v1)
 assets/
   images/                   App art (logo, splash, backgrounds)
+  login_screen/             Looping video for login background
   memories/                 User memories media
 test/
   cycle_models_test.dart    Unit tests for calendar-date normalization and cycle info
