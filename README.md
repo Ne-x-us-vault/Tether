@@ -42,6 +42,10 @@ voice notes, video calls, and more.
   first login.
 - **Pairing** — QR-code based pairing flow (generate, scan, or manual code
   entry), enforced server-side.
+- **Login** — full-screen looping video background with claymorphism UI
+  (soft puffy card, inner shadows, gradient button), Google Fonts Poppins,
+  email sign-in / sign-up with email-verification flow. Uses `media_kit`
+  (libmpv) for smooth video playback.
 
 ## Tech Stack
 
