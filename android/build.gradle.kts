@@ -30,6 +30,18 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
+// Gradle 9.x no longer promotes the transitive `runtime` dependency
+// androidx.concurrent:concurrent-futures onto the compile classpath, which
+// camera_android_camerax needs to compile against camera-core. Declaring it
+// explicitly restores it (see flutter/packages#11203).
+project(":camera_android_camerax") {
+    afterEvaluate {
+        dependencies {
+            add("implementation", "androidx.concurrent:concurrent-futures:1.2.0")
+        }
+    }
+}
+
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }

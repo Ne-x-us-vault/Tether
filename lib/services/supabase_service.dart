@@ -1770,7 +1770,7 @@ class SupabaseService {
         // We only cache the first page (up to 50) as a quick fallback
         p.setString(cacheKey, jsonEncode(response)).ignore();
       }
-      return _decryptMessages(
+      return await _decryptMessages(
         pairingId,
         response.map<Message>((json) => Message.fromJson(json)).toList(),
       );

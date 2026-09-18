@@ -250,7 +250,7 @@ class EncryptionService {
       final partner = await SupabaseService().getPartnerProfile(pairingId);
       final pub = partner?.preferences['e2ee_pubkey'];
       if (pub is! String || pub.isEmpty) return null;
-      return _fingerprintOf(pub);
+      return await _fingerprintOf(pub);
     } catch (e) {
       debugPrint('[E2EE] Could not load partner fingerprint: $e');
       return null;

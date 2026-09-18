@@ -402,7 +402,7 @@ class _BudgetScreenState extends State<BudgetScreen>
       final prefs = await SharedPreferences.getInstance();
       final pairingId = prefs.getString('active_pairing_id');
       if (pairingId == null || pairingId.isEmpty) return null;
-      return _sb.getPairing(pairingId);
+      return await _sb.getPairing(pairingId);
     } catch (e) {
       debugPrint('[Budget] Pairing resolution error: $e');
       return null;
