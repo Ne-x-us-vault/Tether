@@ -42,10 +42,12 @@ voice notes, video calls, and more.
   first login.
 - **Pairing** — QR-code based pairing flow (generate, scan, or manual code
   entry), enforced server-side.
-- **Login** — full-screen looping video background with claymorphism UI
-  (soft puffy card, inner shadows, gradient button), Google Fonts Poppins,
-  email sign-in / sign-up with email-verification flow. Uses `media_kit`
-  (libmpv) for smooth video playback.
+- **Login / Sign up** — pastel-clay design system: a soft pastel wash with
+  drifting pigments, a clay emblem of two people leaning together, a pressed
+  clay form (inset wells, puffy gradient button), one orchestrated entrance,
+  and reduced-motion support. Email sign-in / sign-up with verification and
+  password-reset flows. Bundle fonts (Fredoka display + Nunito UI) render
+  offline — no runtime font fetch. See `lib/theme/clay.dart`.
 
 ## Tech Stack
 
@@ -107,6 +109,9 @@ lib/
     call_service.dart        Jitsi Meet voice/video call join, permissions
     nearby_places_service.dart  Google Places API: "meet halfway" smart suggestions
   theme/
+    clay.dart                Pastel-clay design system: ClayPalette, ClayType,
+                             PastelClayBackground, ClayPanel, ClayWell, ClayButton,
+                             ClayBanner, ClayHeroEmblem
     theme.dart               ThemePresets (32 colors, 9 categories), ThemeColor model,
                              IGDesignTokens
     theme_selector.dart      ThemeSelectorPage: categorized color grid + image picker
@@ -123,7 +128,8 @@ supabase/
   functions/send-notification/  Edge function (push notifications via FCM HTTP v1)
 assets/
   images/                   App art (logo, splash, backgrounds)
-  login_screen/             Looping video for login background
+  fonts/                    Bundled Fredoka + Nunito (pastel-clay typography, OFL)
+  login_screen/             Legacy looping video asset (login now uses the clay wash)
   memories/                 User memories media
 test/
   cycle_models_test.dart    Unit tests for calendar-date normalization and cycle info
@@ -197,6 +203,28 @@ test/
    dart analyze
    flutter test
    ```
+
+6. **Admin / demo access**
+
+   A confirmed demo account is provisioned on the project's Supabase instance
+   so reviewers can sign in and click through the app without waiting on an
+   email link:
+
+   | Field | Value |
+   |-------|-------|
+   | Email | `admin@lovit.app` |
+   | Password | `Lovit@Admin2026` |
+
+   On first login the account has no profile yet, so the app walks through
+   **Profile setup → Pairing**. Pairing needs a second partner, so use
+   **Skip** in the pairing screen to continue to the home shell and explore
+   the rest of the app solo.
+
+   > **Development only.** These credentials are for local/demo review. The
+   > account lives in the shared demo Supabase project; before any production
+   > release, rotate or delete it and never ship seeded credentials.
+   > In debug builds the login screen also shows a *Fill demo admin* shortcut
+   > (hidden in release).
 
 ## Security
 

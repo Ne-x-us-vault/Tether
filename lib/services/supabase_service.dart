@@ -781,6 +781,16 @@ class SupabaseService {
     );
   }
 
+  /// Re-send the sign-up verification email (for accounts awaiting confirmation).
+  Future<void> resendVerificationEmail(String email) async {
+    await client.auth.resend(type: OtpType.signup, email: email);
+  }
+
+  /// Send a password-reset email.
+  Future<void> sendPasswordResetEmail(String email) async {
+    await client.auth.resetPasswordForEmail(email);
+  }
+
   /// Sign out current user
   Future<void> signOut() async {
     _signedUrlCache.clear();
