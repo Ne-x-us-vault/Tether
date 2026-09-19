@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 
 /// Renders a stored media reference that may be:
-///   - a storage path (`avatars/…`, `messages/…`, `memories/…`) resolved to a
+///   - a storage path (`avatars/…`, `messages/…`) resolved to a
 ///     short-lived signed URL (buckets are private — SEC-14),
 ///   - a legacy public storage URL (pre-SEC-14 data) also re-signed,
 ///   - an external URL (used as-is),

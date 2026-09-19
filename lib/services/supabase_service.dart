@@ -157,23 +157,6 @@ class UserProfile {
   }
 }
 
-/// Battery update model for real-time partner battery tracking
-class BatteryUpdate {
-  final String userId;
-  final int level; // 0-100
-  final DateTime lastUpdated;
-
-  BatteryUpdate({
-    required this.userId,
-    required this.level,
-    required this.lastUpdated,
-  });
-
-  @override
-  String toString() =>
-      'BatteryUpdate(user: $userId, level: $level%, at: $lastUpdated)';
-}
-
 class Pairing {
   final String id;
   final String user1Id;
@@ -1197,91 +1180,6 @@ class SupabaseService {
     return controller.stream;
   }
 
-  /// Realtime stream of a partner's battery level (battery_level + battery_last_updated).
-  /// Emits updates whenever the partner's battery changes, even when app is backgrounded.
-  /// Uses BOTH Postgres Changes (reliable, eventual) AND broadcast events (instant).
-  Stream<BatteryUpdate> watchPartnerBattery(String partnerId) {
-    final controller = StreamController<BatteryUpdate>.broadcast();
-
-    // 1. Fetch initial state immediately from DB
-    client
-        .from('profiles')
-        .select()
-        .eq('id', partnerId)
-        .single()
-        .then((data) {
-          if (!controller.isClosed) {
-            try {
-              final profile = UserProfile.fromJson(data);
-              if (profile.batteryLevel != null) {
-                controller.add(
-                  BatteryUpdate(
-                    userId: partnerId,
-                    level: profile.batteryLevel!,
-                    lastUpdated: profile.batteryLastUpdated ?? DateTime.now(),
-                  ),
-                );
-              }
-            } catch (_) {}
-          }
-        })
-        .catchError((_) {});
-
-    // 2. Subscribe to realtime Postgres Changes (eventual consistency)
-    final channel = client
-        .channel('partner_battery_$partnerId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.update,
-          schema: 'public',
-          table: 'profiles',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'id',
-            value: partnerId,
-          ),
-          callback: (payload) {
-            final data = payload.newRecord;
-            if (data.isNotEmpty && !controller.isClosed) {
-              try {
-                final profile = UserProfile.fromJson(data);
-                if (profile.batteryLevel != null) {
-                  controller.add(
-                    BatteryUpdate(
-                      userId: partnerId,
-                      level: profile.batteryLevel!,
-                      lastUpdated: profile.batteryLastUpdated ?? DateTime.now(),
-                    ),
-                  );
-                }
-              } catch (_) {}
-            }
-          },
-        )
-        .subscribe();
-
-    // 3. ALSO subscribe to broadcast-driven profile updates for INSTANT battery updates
-    final broadcastSub = _profileUpdateController.stream.listen((updated) {
-      if (updated.id == partnerId &&
-          !controller.isClosed &&
-          updated.batteryLevel != null) {
-        controller.add(
-          BatteryUpdate(
-            userId: partnerId,
-            level: updated.batteryLevel!,
-            lastUpdated: updated.batteryLastUpdated ?? DateTime.now(),
-          ),
-        );
-      }
-    });
-
-    controller.onCancel = () {
-      client.removeChannel(channel);
-      broadcastSub.cancel();
-    };
-
-    return controller.stream;
-  }
-
   /// Stores the user's E2EE public key in their profile preferences so
   /// partners can derive the shared message key.
   Future<void> uploadE2eePublicKey(String publicKeyB64) async {
@@ -1515,18 +1413,6 @@ class SupabaseService {
     });
 
     return controller.stream;
-  }
-
-  Future<void> updateBatteryLevel(int level) async {
-    if (currentUserId == null) return;
-    await _ensureProfileRow();
-    await client
-        .from('profiles')
-        .update({
-          'battery_level': level,
-          'battery_last_updated': DateTime.now().toUtc().toIso8601String(),
-        })
-        .eq('id', currentUserId!);
   }
 
   Future<void> updateLocation(
@@ -2718,22 +2604,6 @@ class SupabaseService {
     return 'messages/$path';
   }
 
-  Future<String> uploadMemory(
-    String pairingId,
-    String memoryId,
-    String filePath,
-  ) async {
-    final extension = filePath.split('.').last;
-    final path = '$pairingId/$memoryId.$extension';
-    await client.storage
-        .from('memories')
-        .upload(
-          path,
-          File(filePath), // ← wrap with File
-        );
-    return 'memories/$path';
-  }
-
   // ── Signed-URL resolution for private media (SEC-14) ──────────────────────
 
   static const Duration _signedUrlTtl = Duration(hours: 48);
@@ -2742,7 +2612,7 @@ class SupabaseService {
 
   /// Resolves a stored media reference into a URL usable by network-image
   /// widgets. Accepts:
-  ///   - a storage path (`avatars/…`, `messages/…`, `memories/…`) → signed URL,
+  ///   - a storage path (`avatars/…`, `messages/…`) → signed URL,
   ///   - a legacy public storage URL (already in the DB) → re-signed,
   ///   - an external URL → returned unchanged,
   ///   - anything else (local file path) → returned unchanged.
@@ -2751,8 +2621,7 @@ class SupabaseService {
 
     if (!value.startsWith('http')) {
       if (value.startsWith('avatars/') ||
-          value.startsWith('messages/') ||
-          value.startsWith('memories/')) {
+          value.startsWith('messages/')) {
         final bucket = value.substring(0, value.indexOf('/'));
         return _signedUrl(bucket, value);
       }

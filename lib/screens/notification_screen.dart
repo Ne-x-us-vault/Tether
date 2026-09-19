@@ -9,7 +9,6 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
-import '../services/notification_service.dart';
 import '../services/supabase_service.dart';
 import '../widgets/glass.dart';
 
@@ -33,7 +32,6 @@ enum NotificationType {
   calendar,
   battery,
   period,
-  memory,
   mood,
   chat,
   call,
@@ -165,9 +163,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
         case 'period':
           type = NotificationType.period;
           break;
-        case 'memory':
-          type = NotificationType.memory;
-          break;
         case 'message':
         case 'reaction':
         case 'pin':
@@ -230,7 +225,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
       case NotificationType.location:
         return 4;
       case NotificationType.battery:
-      case NotificationType.memory:
       case NotificationType.mood:
         return null;
     }
@@ -265,8 +259,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
         } else if (targetTab != null) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setInt('notification_tab', targetTab);
-          NotificationService.pendingHomeAction.value =
-              NotificationService.homeTasksAction;
           if (mounted) context.go('/home');
         }
         break;
@@ -300,7 +292,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
         }
         break;
       case NotificationType.battery:
-      case NotificationType.memory:
       case NotificationType.mood:
         break;
     }
@@ -594,10 +585,6 @@ class _NotificationTile extends StatelessWidget {
       case NotificationType.period:
         iconData = Icons.nightlight_round;
         color = _kPink;
-        break;
-      case NotificationType.memory:
-        iconData = Icons.photo_library_rounded;
-        color = _kPurple;
         break;
       case NotificationType.mood:
         iconData = Icons.face_rounded;

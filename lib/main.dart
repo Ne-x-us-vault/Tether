@@ -11,7 +11,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:workmanager/workmanager.dart';
 
 import 'core/constants/supabase_constants.dart';
-import 'services/battery_sync_service.dart';
 import 'services/call_service.dart';
 import 'services/encryption_service.dart';
 import 'services/location_sync_service.dart';
@@ -21,7 +20,7 @@ import 'screens/login_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/pairing_screen.dart';
 import 'screens/pairing_debug_screen.dart';
-import 'screens/home_screen.dart';
+import 'features/home/home_screen.dart';
 import 'screens/notification_screen.dart';
 import 'screens/budget_screen.dart';
 import 'screens/calendar_screen.dart';
@@ -31,7 +30,6 @@ import 'screens/profile_setup_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/edit_profile_screen.dart';
 import 'widgets/floating_nav_bar.dart';
-import 'widgets/glass.dart';
 
 late final SharedPreferences _prefs;
 late final GoRouter _router;
@@ -45,9 +43,6 @@ void callbackDispatcher() {
     switch (task) {
       case 'locationSync':
         await LocationSyncService.performBackgroundSync();
-        break;
-      case 'batterySync':
-        await BatterySyncService.performBackgroundSync();
         break;
     }
     return Future.value(true);
@@ -89,7 +84,6 @@ void main() async {
 
   // Initialize Services asynchronously so they don't block app startup
   unawaited(LocationSyncService().initialize());
-  unawaited(BatterySyncService().initialize());
 
   // Listen to auth state changes and update router
   unawaited(
@@ -513,23 +507,12 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: const Color(0xFF0B0A12),
       extendBody: true,
-      body: Stack(
-        children: [
-          const Positioned.fill(
-            child: LovitBackground(
-              blurSigma: 26,
-              darkOverlayOpacity: 0.56,
-              vignetteOpacity: 0.30,
-            ),
-          ),
-          PageView(
-            controller: _pageController,
-            physics: const BouncingScrollPhysics(parent: PageScrollPhysics()),
-            children: _pages,
-          ),
-        ],
+      body: PageView(
+        controller: _pageController,
+        physics: const BouncingScrollPhysics(parent: PageScrollPhysics()),
+        children: _pages,
       ),
       bottomNavigationBar: SafeArea(
         top: false,

@@ -31,8 +31,6 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 class NotificationService {
   NotificationService._();
   static final NotificationService instance = NotificationService._();
-  static const String homeTasksAction = 'home_tasks';
-  static final ValueNotifier<String?> pendingHomeAction = ValueNotifier(null);
 
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _local = FlutterLocalNotificationsPlugin();
@@ -279,7 +277,6 @@ class NotificationService {
         break;
       case 'task':
         _navigateToTab(0);
-        _setPendingHomeAction(homeTasksAction);
         _routeToHome(context);
         break;
       case 'location':
@@ -298,10 +295,6 @@ class NotificationService {
     SharedPreferences.getInstance().then((prefs) {
       prefs.setInt('notification_tab', index);
     });
-  }
-
-  void _setPendingHomeAction(String action) {
-    pendingHomeAction.value = action;
   }
 
   void _routeToHome(BuildContext context) {
