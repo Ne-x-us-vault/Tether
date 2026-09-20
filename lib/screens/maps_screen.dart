@@ -11,7 +11,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../main.dart' show kNavBarPad;
+import '../core/constants/app_constants.dart';
 import '../services/location_sync_service.dart';
 import '../services/supabase_service.dart';
 import '../widgets/secure_media_image.dart';
@@ -543,7 +543,7 @@ class _MapsScreenState extends State<MapsScreen>
           // 4. DESTINATION HUB (BOTTOM CARD)
           if (_selectedPlace != null && !_isSearching)
             Positioned(
-              bottom: kNavBarPad + 24,
+              bottom: AppLayout.kNavBarPad + 24,
               left: 20,
               right: 20,
               child: _PremiumGlassPanel(

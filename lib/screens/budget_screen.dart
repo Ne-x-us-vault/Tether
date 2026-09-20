@@ -12,7 +12,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
 
-import '../main.dart' show kNavBarPad;
+import '../core/constants/app_constants.dart';
 import '../services/supabase_service.dart';
 import '../widgets/glass.dart';
 
@@ -791,7 +791,7 @@ class _BudgetScreenState extends State<BudgetScreen>
     final mq = MediaQuery.of(context);
     final topInset = mq.padding.top;
     final botInset = mq.padding.bottom;
-    final navPad = botInset + kNavBarPad;
+    final navPad = botInset + AppLayout.kNavBarPad;
 
     // Show error state (even after loading finishes, if no pairing)
     if (_error != null && !_loading) {
